@@ -11,8 +11,6 @@ struct coordinates {
     int y;
 };
 
-void generate_enemies();
-
 const chtype BORDER = '#';
 const chtype PLAYER = '@';
 const chtype PLAYER_BULLET = '|';
@@ -27,6 +25,11 @@ int PLAYER_HEIGHT = HEIGHT - 1;
 int PLAYER_WIDTH = WIDTH / 2;
 
 int read_keyboard = 0;
+
+const int MAX_ENEMIES = 10;
+int current_enemies = 0;
+
+int score = 0;
 
 pthread_mutex_t master_mutex;
 pthread_mutex_t collision_mutex;
@@ -43,9 +46,11 @@ void init() {
         mvaddch(HEIGHT, i, BORDER);
     }
 
-    //generate_enemies();
-
     mvaddch(PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER);
+}
+
+int get_at(int y, int x) {
+    return mvinch(y, x) & A_CHARTEXT;
 }
 
 void *pew() {
@@ -79,6 +84,15 @@ void *ship(void *args) {
 
         mvaddch(x, y, NOTHING);
         x += 1;
+
+        if (get_at(x, y) == (int) PLAYER_BULLET) {
+            // shine
+            pthread_mutex_unlock(&collision_mutex);
+            score += 1;
+            current_enemies -= 1;
+            return NULL;
+        }
+
         mvaddch(x, y, ENEMY);
 
         pthread_mutex_unlock(&collision_mutex);
@@ -88,23 +102,24 @@ void *ship(void *args) {
     mvaddch(x, y, NOTHING);
 }
 
-void generate_enemies() {
-    srand(time(NULL));
+void generate_enemy() {
 
-    int r = rand()*3;
-    for (int i = 0; i < r; i++) {
-        int x = (int) (rand() * (WIDTH - 2));
-        // upper screen
-        int y = (int) (rand() + (HEIGHT - 2)) / 2;
-
-        mvaddch(x, y, ENEMY);
-        struct coordinates args;
-        args.x = x;
-        args.y = y;
-
-        pthread_t ship_thread;
-        pthread_create(&ship_thread, NULL, &ship, (void *) &args);
+    if (current_enemies >= MAX_ENEMIES) {
+        return;
     }
+
+    int y = (int) (rand() % (WIDTH - 2));
+    // upper screen
+    int x = (int) (rand() % (HEIGHT - 2)) / 2;
+
+    mvaddch(x, y, ENEMY);
+    struct coordinates args;
+    args.x = x;
+    args.y = y;
+
+    pthread_t ship_thread;
+    pthread_create(&ship_thread, NULL, &ship, (void *) &args);
+    current_enemies += 1;
 }
 
 void *keyboard() {
@@ -140,6 +155,8 @@ void *keyboard() {
 }
 
 int main() {
+    srand(time(NULL));
+
     WINDOW *master = stdscr;
     setlocale(LC_ALL, "C");
 
@@ -147,10 +164,11 @@ int main() {
     initscr(); cbreak(); noecho();
     keypad(stdscr, true);
 
+    pthread_mutex_init(&collision_mutex, NULL);
+
     init();
 
     pthread_mutex_init(&master_mutex, NULL);
-    pthread_mutex_init(&collision_mutex, NULL);
 
     pthread_t keyboard_thread;
     pthread_create(&keyboard_thread, NULL, keyboard, NULL);
@@ -162,7 +180,10 @@ int main() {
         refresh();
         read_keyboard = 1;
         pthread_mutex_unlock(&master_mutex);
-        //generate_enemies();
+
+
+
+        generate_enemy();
 
     }
     return 0;
