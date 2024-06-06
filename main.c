@@ -33,7 +33,7 @@ int current_enemies = 0;
 
 int score = 0;
 
-int TICK_LEN = 500;
+int TICK_LEN = 50;
 int TICK_KEY = 100;
 
 pthread_mutex_t master_mutex;
@@ -126,6 +126,8 @@ void *ship(void *args) {
         msleep(TICK_LEN);
     }
     mvaddch(x, y, NOTHING);
+    current_enemies -= 1;
+    score -= 5;
 }
 
 void generate_enemy() {
