@@ -34,10 +34,9 @@ int current_enemies = 0;
 int score = 0;
 
 int TICK_LEN = 50;
-int TICK_KEY = 100;
+int TICK_KEY = 30;
 
 pthread_mutex_t master_mutex;
-pthread_mutex_t collision_mutex;
 
 int msleep(long msec)
 {
@@ -85,17 +84,21 @@ void *pew() {
     int y = PLAYER_WIDTH;
 
     while (x > 1) {
-        pthread_mutex_lock(&collision_mutex);
+        pthread_mutex_lock(&master_mutex);
 
         mvaddch(x, y, NOTHING);
         x -= 1;
         mvaddch(x, y, PLAYER_BULLET);
 
-        pthread_mutex_unlock(&collision_mutex);
+        pthread_mutex_unlock(&master_mutex);
 
         msleep(TICK_LEN);
     }
+    pthread_mutex_unlock(&master_mutex);
+
     mvaddch(x, y, NOTHING);
+
+    pthread_mutex_unlock(&master_mutex);
 }
 
 void *ship(void *args) {
@@ -106,14 +109,14 @@ void *ship(void *args) {
 
     // move ship
     while (x < HEIGHT - 1) {
-        pthread_mutex_lock(&collision_mutex);
+        pthread_mutex_lock(&master_mutex);
 
         mvaddch(x, y, NOTHING);
         x += 1;
 
         if (get_at(x, y) == (int) PLAYER_BULLET) {
             // shine
-            pthread_mutex_unlock(&collision_mutex);
+            pthread_mutex_unlock(&master_mutex);
             score += 1;
             current_enemies -= 1;
             return NULL;
@@ -121,13 +124,17 @@ void *ship(void *args) {
 
         mvaddch(x, y, ENEMY);
 
-        pthread_mutex_unlock(&collision_mutex);
+        pthread_mutex_unlock(&master_mutex);
 
         msleep(TICK_LEN);
     }
+    pthread_mutex_lock(&master_mutex);
+
     mvaddch(x, y, NOTHING);
     current_enemies -= 1;
     score -= 5;
+
+    pthread_mutex_unlock(&master_mutex);
 }
 
 void generate_enemy() {
@@ -140,7 +147,6 @@ void generate_enemy() {
     // upper screen
     int x = (int) (rand() % (HEIGHT - 2)) / 2;
 
-    mvaddch(x, y, ENEMY);
     struct coordinates args;
     args.x = x;
     args.y = y;
@@ -157,21 +163,33 @@ void *keyboard() {
 
 
         if (d == KEY_LEFT && PLAYER_WIDTH > 1) {
+            pthread_mutex_lock(&master_mutex);
+
             mvaddch(PLAYER_HEIGHT, PLAYER_WIDTH, NOTHING);
             PLAYER_WIDTH -= 1;
             mvaddch(PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER);
+
+            pthread_mutex_unlock(&master_mutex);
         }
         else if (d == KEY_RIGHT && PLAYER_WIDTH < WIDTH - 1) {
+            pthread_mutex_lock(&master_mutex);
+
             mvaddch(PLAYER_HEIGHT, PLAYER_WIDTH, NOTHING);
             PLAYER_WIDTH += 1;
             mvaddch(PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER);
+
+            pthread_mutex_unlock(&master_mutex);
         }
         else if (d == (int) 'z') {
+            pthread_mutex_lock(&master_mutex);
+
             // pew! pew! pew!
             mvaddch(PLAYER_HEIGHT-1, PLAYER_WIDTH, PLAYER_BULLET);
 
             pthread_t pew_thread;
             pthread_create(&pew_thread, NULL, pew, NULL);
+
+            pthread_mutex_unlock(&master_mutex);
         }
         msleep(TICK_KEY);
    }
@@ -187,14 +205,14 @@ int main() {
     initscr(); cbreak(); noecho();
     keypad(stdscr, true);
 
-    pthread_mutex_init(&collision_mutex, NULL);
-
     init();
 
     pthread_mutex_init(&master_mutex, NULL);
 
     pthread_t keyboard_thread;
     pthread_create(&keyboard_thread, NULL, keyboard, NULL);
+
+    msleep(30);
 
     while (true) {
         read_keyboard = 0;
@@ -203,9 +221,7 @@ int main() {
         refresh();
         read_keyboard = 1;
         pthread_mutex_unlock(&master_mutex);
-
-
-
+        msleep(30);
         generate_enemy();
 
     }
