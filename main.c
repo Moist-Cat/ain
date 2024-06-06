@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
+#include <time.h>
+#include <errno.h>
 
 struct coordinates {
     int x;
@@ -31,8 +33,32 @@ int current_enemies = 0;
 
 int score = 0;
 
+int TICK_LEN = 500;
+int TICK_KEY = 100;
+
 pthread_mutex_t master_mutex;
 pthread_mutex_t collision_mutex;
+
+int msleep(long msec)
+{
+    struct timespec ts;
+    int res;
+
+    if (msec < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
+}
 
 void init() {
     // border
@@ -67,7 +93,7 @@ void *pew() {
 
         pthread_mutex_unlock(&collision_mutex);
 
-        sleep(1);
+        msleep(TICK_LEN);
     }
     mvaddch(x, y, NOTHING);
 }
@@ -97,7 +123,7 @@ void *ship(void *args) {
 
         pthread_mutex_unlock(&collision_mutex);
 
-        sleep(1);
+        msleep(TICK_LEN);
     }
     mvaddch(x, y, NOTHING);
 }
@@ -124,11 +150,6 @@ void generate_enemy() {
 
 void *keyboard() {
     while (true) {
-        if (!read_keyboard) {
-            sleep(0.02);
-            continue;
-        }
-
         int d;
         d = getch();
 
@@ -150,7 +171,7 @@ void *keyboard() {
             pthread_t pew_thread;
             pthread_create(&pew_thread, NULL, pew, NULL);
         }
-        sleep(0.02);
+        msleep(TICK_KEY);
    }
 }
 
