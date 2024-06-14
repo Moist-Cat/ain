@@ -27,6 +27,7 @@ int PLAYER_HEIGHT = HEIGHT - 1;
 int PLAYER_WIDTH = WIDTH / 2;
 
 int read_keyboard = 0;
+int *CLOCK;
 
 const int MAX_ENEMIES = 10;
 int current_enemies = 0;
@@ -37,6 +38,7 @@ int TICK_LEN = 250;
 int TICK_KEY = 0;
 
 pthread_mutex_t master_mutex;
+pthread_mutex_t clock_mutex;
 
 int msleep(long msec)
 {
@@ -61,6 +63,12 @@ int msleep(long msec)
 
 void init() {
     // border
+    
+    CLOCK = (int *) malloc(sizeof(int)*(WIDTH - 2));
+
+    for (int i = 0; i < HEIGHT / 2; i++) {
+        CLOCK[i] = 0;
+    }
 
     for (int i = 0; i < HEIGHT; i++) {
         mvaddch(i, 0, BORDER);
@@ -158,6 +166,41 @@ void generate_enemy() {
     // upper screen
     int x = (int) ((rand() % (HEIGHT + 2)) / 2) + 1;
 
+    pthread_mutex_lock(&clock_mutex);
+
+    while (CLOCK[y] == 1) {
+        CLOCK[y] = 0;
+        if (y == (WIDTH - 2)) {
+            y = 0;
+        }
+        y += 1;
+    }
+
+    if (y > 2) {
+        CLOCK[y-2] = 1;
+    }
+    if (y > 1) {
+        CLOCK[y-1] = 1;
+    }
+    CLOCK[y] = 1;
+    if (y < (WIDTH - 2) - 1) {
+        CLOCK[y+1] = 1;
+    }
+    if (y < (WIDTH / 2) - 2) {
+        CLOCK[y+2] = 1;
+    }
+
+    if (y == 0) {
+        y++;
+    }
+    if (y >= (WIDTH-2)) {
+       y--;
+       y--;
+       y--;
+    }
+
+    pthread_mutex_unlock(&clock_mutex);
+
     struct coordinates args;
     args.x = x;
     args.y = y;
@@ -220,6 +263,7 @@ int main() {
     init();
 
     pthread_mutex_init(&master_mutex, NULL);
+    pthread_mutex_init(&clock_mutex, NULL);
 
     pthread_t keyboard_thread;
     pthread_create(&keyboard_thread, NULL, keyboard, NULL);
