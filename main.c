@@ -131,6 +131,10 @@ void *ship(void *args) {
 
         mvaddch(x, y, NOTHING);
         x += 1;
+        // move in diagonal
+        if (y > 1 && y < WIDTH - 1) {
+            y += rand() % 3 - 1;
+        }
 
         if (get_at(x, y) == (int) PLAYER_BULLET) {
             // shine and del bullet
