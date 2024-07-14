@@ -199,15 +199,16 @@ void generate_enemy() {
        y--;
     }
 
-    pthread_mutex_unlock(&clock_mutex);
 
-    struct coordinates args;
-    args.x = x;
-    args.y = y;
+    struct coordinates *args = malloc(sizeof(struct coordinates));
+    args->x = x;
+    args->y = y;
 
     pthread_t ship_thread;
-    pthread_create(&ship_thread, NULL, &ship, (void *) &args);
+    pthread_create(&ship_thread, NULL, &ship, (void *) args);
     current_enemies += 1;
+
+    pthread_mutex_unlock(&clock_mutex);
 }
 
 void *keyboard() {
